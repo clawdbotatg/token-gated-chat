@@ -57,7 +57,7 @@ function VerifyInner() {
         `${domain} wants you to sign in with your Ethereum account:`,
         address,
         "",
-        `Verify $CLAWD token ownership for Telegram user ${tg}`,
+        `Verify CLAWD token ownership for Telegram user ${tg}`,
         "",
         `URI: ${origin}`,
         `Version: 1`,
