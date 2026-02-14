@@ -5,136 +5,137 @@ const { checkBalance } = require("../shared/token");
 
 const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
-// Track pending verifications: { telegramUserId: { chatId, timeout } }
-const pending = new Map();
+// /start command — main entry point
+bot.command("start", async (ctx) => {
+  const userId = ctx.from.id;
 
-// New member joins — send verification link
-bot.on("chat_member", async (ctx) => {
-  const update = ctx.chatMember;
-  const wasNotMember = ["left", "kicked"].includes(update.old_chat_member.status);
-  const isMember = ["member", "restricted"].includes(update.new_chat_member.status);
-
-  if (!wasNotMember || !isMember) return;
-
-  const userId = update.new_chat_member.user.id;
-  const chatId = update.chat.id;
-  const firstName = update.new_chat_member.user.first_name;
-
-  // Check if already verified with valid balance
+  // Check if already verified
   const existing = store.getUser(userId);
   if (existing) {
     const hasBalance = await checkBalance(existing.wallet);
     if (hasBalance) {
-      console.log(`User ${userId} already verified with wallet ${existing.wallet}`);
+      const inviteLink = await getInviteLink();
+      await ctx.reply(
+        `🦞 You're already verified!\n\n` +
+          `Wallet: \`${existing.wallet.slice(0, 6)}...${existing.wallet.slice(-4)}\`\n\n` +
+          (inviteLink
+            ? `Join the $CLAWD holders chat:\n👉 ${inviteLink}`
+            : `You're verified but I couldn't generate an invite link. Ask an admin!`),
+        { parse_mode: "Markdown" }
+      );
       return;
     }
-    // Balance gone — remove verification
+    // Balance gone
     store.removeUser(userId);
   }
 
-  const verifyUrl = `${config.WEB_URL}/verify?tg=${userId}&chat=${chatId}`;
-
-  try {
-    await bot.api.sendMessage(
-      userId,
-      `🦞 Welcome! To join the $CLAWD holders chat, verify your token ownership:\n\n` +
-        `👉 ${verifyUrl}\n\n` +
-        `You have ${config.VERIFICATION_TIMEOUT_MS / 60000} minutes to verify or you'll be removed.`
-    );
-  } catch (err) {
-    // Can't DM user — send in group
-    console.log(`Can't DM user ${userId}, sending in group`);
-    try {
-      await bot.api.sendMessage(
-        chatId,
-        `Welcome ${firstName}! Please DM me @${(await bot.api.getMe()).username} to get your verification link, ` +
-          `or open this link: ${verifyUrl}\n\n` +
-          `Verify within ${config.VERIFICATION_TIMEOUT_MS / 60000} minutes or you'll be removed.`
-      );
-    } catch (e) {
-      console.error("Failed to send group message:", e.message);
-    }
-  }
-
-  // Set timeout to kick
-  const timeout = setTimeout(async () => {
-    pending.delete(userId);
-    const user = store.getUser(userId);
-    if (!user) {
-      console.log(`Kicking unverified user ${userId} from ${chatId}`);
-      try {
-        await bot.api.banChatMember(chatId, userId, {
-          until_date: Math.floor(Date.now() / 1000) + 60, // unban after 60s so they can retry
-        });
-      } catch (e) {
-        console.error(`Failed to kick ${userId}:`, e.message);
-      }
-    }
-  }, config.VERIFICATION_TIMEOUT_MS);
-
-  pending.set(userId, { chatId, timeout });
-});
-
-// /start command — show info
-bot.command("start", async (ctx) => {
-  const args = ctx.match;
-  if (args && args.startsWith("verify_")) {
-    const parts = args.split("_");
-    const chatId = parts[1];
-    const verifyUrl = `${config.WEB_URL}/verify?tg=${ctx.from.id}&chat=${chatId}`;
-    await ctx.reply(
-      `🦞 Verify your $CLAWD token ownership:\n\n👉 ${verifyUrl}`
-    );
-    return;
-  }
+  const verifyUrl = `${config.WEB_URL}/verify?tg=${userId}&chat=${config.TELEGRAM_CHAT_ID}`;
 
   await ctx.reply(
-    `🦞 I'm the $CLAWD Token Gate Bot!\n\n` +
-      `I verify that members of token-gated chats hold the required tokens.\n\n` +
-      `If you just joined a gated chat, you should have received a verification link.`
+    `🦞 Welcome to the $CLAWD Token Gate!\n\n` +
+      `To join the holders-only chat, verify you hold $CLAWD tokens:\n\n` +
+      `👉 ${verifyUrl}\n\n` +
+      `Connect your wallet, sign a message, and if you hold $CLAWD on Base, you'll get an invite link!`,
   );
 });
 
-// /status command — check verification status
+// /status command
 bot.command("status", async (ctx) => {
   const user = store.getUser(ctx.from.id);
   if (!user) {
-    await ctx.reply("❌ You are not verified. Join a gated chat to start verification.");
+    await ctx.reply("❌ Not verified yet. Send /start to begin!");
     return;
   }
   const hasBalance = await checkBalance(user.wallet);
-  await ctx.reply(
-    `✅ Verified!\n` +
-      `Wallet: ${user.wallet.slice(0, 6)}...${user.wallet.slice(-4)}\n` +
-      `Verified at: ${user.verifiedAt}\n` +
-      `Balance OK: ${hasBalance ? "✅" : "❌ (you may be removed at next check)"}`
-  );
+  if (hasBalance) {
+    await ctx.reply(
+      `✅ Verified!\n` +
+        `Wallet: \`${user.wallet.slice(0, 6)}...${user.wallet.slice(-4)}\`\n` +
+        `Verified: ${user.verifiedAt}`,
+      { parse_mode: "Markdown" }
+    );
+  } else {
+    store.removeUser(ctx.from.id);
+    await ctx.reply(
+      "❌ Your wallet no longer holds enough $CLAWD. Send /start to re-verify with a different wallet."
+    );
+  }
 });
 
-// Periodic balance re-check
+// Webhook callback from Vercel when someone verifies successfully
+bot.on("message:text", async (ctx) => {
+  // Ignore group messages
+  if (ctx.chat.type !== "private") return;
+
+  // If not a command, just nudge them
+  await ctx.reply("Send /start to verify your $CLAWD tokens and get an invite link! 🦞");
+});
+
+// Generate a one-time invite link
+let _cachedInviteLink = null;
+let _inviteLinkExpiry = 0;
+
+async function getInviteLink() {
+  try {
+    // Create a fresh invite link each time (single-use)
+    const result = await bot.api.createChatInviteLink(Number(config.TELEGRAM_CHAT_ID), {
+      member_limit: 1,
+      name: "CLAWD Token Gate",
+    });
+    return result.invite_link;
+  } catch (err) {
+    console.error("Failed to create invite link:", err.message);
+    return null;
+  }
+}
+
+// HTTP endpoint for Vercel to call after successful verification
+// The bot polls for new verifications via the store
+// Check every 5 seconds for newly verified users who need invite links
+setInterval(async () => {
+  const users = store.getAllUsers();
+  for (const [telegramUserId, data] of Object.entries(users)) {
+    if (data.inviteSent) continue;
+
+    // New verification! Send invite link
+    try {
+      const inviteLink = await getInviteLink();
+      if (inviteLink) {
+        await bot.api.sendMessage(
+          Number(telegramUserId),
+          `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\n` +
+            `Here's your invite to the holders chat:\n👉 ${inviteLink}\n\n` +
+            `This link is single-use. Welcome aboard!`
+        );
+        store.markInviteSent(telegramUserId);
+        console.log(`✅ Sent invite to user ${telegramUserId}`);
+      }
+    } catch (err) {
+      console.error(`Failed to send invite to ${telegramUserId}:`, err.message);
+    }
+  }
+}, 5000);
+
+// Periodic balance re-check — kick users who sold
 async function recheckBalances() {
   console.log("Running periodic balance re-check...");
   const users = store.getAllUsers();
   for (const [telegramUserId, data] of Object.entries(users)) {
     const hasBalance = await checkBalance(data.wallet);
     if (!hasBalance) {
-      console.log(`User ${telegramUserId} no longer holds tokens, removing from chat ${data.chatId}`);
+      console.log(`User ${telegramUserId} no longer holds tokens`);
       try {
-        await bot.api.banChatMember(Number(data.chatId), Number(telegramUserId), {
+        await bot.api.banChatMember(Number(config.TELEGRAM_CHAT_ID), Number(telegramUserId), {
           until_date: Math.floor(Date.now() / 1000) + 60,
         });
-        store.removeUser(telegramUserId);
-        // Try to notify user
-        try {
-          await bot.api.sendMessage(
-            Number(telegramUserId),
-            `🦞 You've been removed from the $CLAWD holders chat because your token balance is now insufficient.\n\n` +
-              `Get more $CLAWD and rejoin anytime!`
-          );
-        } catch (_) {}
+        await bot.api.sendMessage(
+          Number(telegramUserId),
+          `🦞 You've been removed from the $CLAWD chat because your balance dropped.\n\nGet more $CLAWD and re-verify anytime with /start!`
+        ).catch(() => {});
       } catch (e) {
         console.error(`Failed to kick ${telegramUserId}:`, e.message);
       }
+      store.removeUser(telegramUserId);
     }
   }
 }
@@ -156,10 +157,9 @@ bot.catch((err) => {
 // Start
 console.log("🦞 $CLAWD Token Gate Bot starting...");
 bot.start({
-  allowed_updates: ["chat_member", "message"],
+  allowed_updates: ["message"],
   onStart: (botInfo) => {
     console.log(`Bot @${botInfo.username} is running!`);
-    // Start periodic re-checks
     setInterval(recheckBalances, config.RECHECK_INTERVAL_MS);
   },
 });

@@ -46,4 +46,12 @@ function getAllUsers() {
   return load();
 }
 
-module.exports = { getUser, setUser, removeUser, getAllUsers };
+function markInviteSent(telegramUserId) {
+  const data = load();
+  if (data[String(telegramUserId)]) {
+    data[String(telegramUserId)].inviteSent = true;
+    save(data);
+  }
+}
+
+module.exports = { getUser, setUser, removeUser, getAllUsers, markInviteSent };
