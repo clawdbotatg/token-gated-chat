@@ -3,6 +3,8 @@ const config = require("../shared/config");
 const store = require("../shared/store");
 const { checkBalance } = require("../shared/token");
 
+const { getVerifiedUserFromKV } = require("./kv-check");
+
 const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
 // /start command — main entry point
@@ -137,6 +139,52 @@ async function recheckBalances() {
   }
 }
 
+// Watch for new members joining the group — kick if not verified with tokens
+bot.on("chat_member", async (ctx) => {
+  const update = ctx.chatMember;
+  const chatId = String(update.chat.id);
+  
+  // Only care about the token-gated group
+  if (chatId !== String(config.TELEGRAM_CHAT_ID)) return;
+  
+  // Only care about users becoming members (joined/unrestricted)
+  const newStatus = update.new_chat_member.status;
+  const oldStatus = update.old_chat_member.status;
+  const isJoining = (oldStatus === "left" || oldStatus === "kicked") && 
+                    (newStatus === "member" || newStatus === "restricted");
+  if (!isJoining) return;
+
+  const userId = update.new_chat_member.user.id;
+  const username = update.new_chat_member.user.username || userId;
+  
+  // Check if they're verified (local store OR KV)
+  const existing = store.getUser(userId) || await getVerifiedUserFromKV(userId);
+  if (existing) {
+    // Verified — double-check balance
+    const hasBalance = await checkBalance(existing.wallet);
+    if (hasBalance) {
+      console.log(`✅ Verified member joined: ${username}`);
+      return;
+    }
+    // Balance gone — kick
+    store.removeUser(userId);
+  }
+
+  // Not verified or no balance — kick immediately
+  console.log(`🚫 Unverified member joined: ${username} — kicking`);
+  try {
+    await bot.api.banChatMember(Number(chatId), userId, {
+      until_date: Math.floor(Date.now() / 1000) + 60, // 60s ban = kick
+    });
+    await bot.api.sendMessage(userId,
+      `🦞 You need to hold $CLAWD tokens to join that chat!\n\n` +
+      `Verify your wallet first: /start`
+    ).catch(() => {}); // DM might fail if they never messaged bot
+  } catch (err) {
+    console.error(`Failed to kick unverified ${username}:`, err.message);
+  }
+});
+
 // Error handling
 bot.catch((err) => {
   const ctx = err.ctx;
@@ -154,7 +202,7 @@ bot.catch((err) => {
 // Start
 console.log("🦞 $CLAWD Token Gate Bot starting...");
 bot.start({
-  allowed_updates: ["message"],
+  allowed_updates: ["message", "chat_member"],
   onStart: (botInfo) => {
     console.log(`Bot @${botInfo.username} is running!`);
     setInterval(recheckBalances, config.RECHECK_INTERVAL_MS);
