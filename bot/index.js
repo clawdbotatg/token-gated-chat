@@ -62,12 +62,9 @@ bot.command("status", async (ctx) => {
   }
 });
 
-// Webhook callback from Vercel when someone verifies successfully
+// Private messages that aren't commands — nudge them
 bot.on("message:text", async (ctx) => {
-  // Ignore group messages
   if (ctx.chat.type !== "private") return;
-
-  // If not a command, just nudge them
   await ctx.reply("Send /start to verify your $CLAWD tokens and get an invite link! 🦞");
 });
 

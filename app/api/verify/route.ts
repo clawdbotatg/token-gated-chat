@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SiweMessage } from "siwe";
 import { verifyNonce } from "~/lib/nonce";
 import { checkBalance } from "~/lib/token";
+import { saveVerifiedUser } from "~/lib/github-store";
 
 async function sendTelegramInvite(telegramUserId: string, wallet: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -76,6 +77,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    // Save wallet mapping for periodic balance rechecks
+    await saveVerifiedUser(nonceData.tg, verified.address);
 
     const inviteLink = await sendTelegramInvite(nonceData.tg, verified.address);
 
