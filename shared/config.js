@@ -9,5 +9,5 @@ module.exports = {
   CLAWD_MIN_BALANCE: BigInt(process.env.CLAWD_MIN_BALANCE || "1"),
   BASE_RPC_URL: process.env.BASE_RPC_URL || "https://mainnet.base.org",
   VERIFICATION_TIMEOUT_MS: parseInt(process.env.VERIFICATION_TIMEOUT_MINUTES || "10") * 60 * 1000,
-  RECHECK_INTERVAL_MS: parseInt(process.env.RECHECK_INTERVAL_HOURS || "24") * 60 * 60 * 1000,
+  RECHECK_INTERVAL_MS: parseInt(process.env.RECHECK_INTERVAL_MINUTES || "300") * 60 * 1000,
 };
