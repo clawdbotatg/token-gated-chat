@@ -73,7 +73,7 @@ module.exports = async function handler(req, res) {
     const hasBalance = await checkBalance(verified.address);
     if (!hasBalance) {
       return res.status(403).json({
-        error: "Insufficient $CLAWD balance. You need at least 1 $CLAWD token on Base.",
+        error: "Insufficient $CLAWD balance. You need at least 10M $CLAWD (~$500 worth) on Base.",
         address: verified.address,
       });
     }
