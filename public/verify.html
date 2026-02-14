@@ -88,41 +88,24 @@
       const url = window.location.href;
       const container = document.querySelector('.container');
 
-      // Try auto-open in system browser first
-      // On iOS: window.open with _blank sometimes breaks out of in-app browser
-      // On Android: intent:// for Chrome
-      const isAndroid = /android/i.test(navigator.userAgent);
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      // Build MetaMask deep link — opens our page INSIDE MetaMask's browser
+      // where window.ethereum is available. Works from any in-app browser.
+      const dappUrl = window.location.host + window.location.pathname + window.location.search;
+      const metamaskDeepLink = 'https://metamask.app.link/dapp/' + dappUrl;
 
       container.innerHTML = `
         <div class="logo">🦞</div>
-        <h1>Open in Your Browser</h1>
-        <p class="subtitle">This page needs a wallet (like MetaMask) to verify your $CLAWD tokens. Open it in ${isIOS ? 'Safari' : 'Chrome'} or your wallet app's browser.</p>
-        <a href="${url}" target="_blank" rel="noopener"
-          class="btn" style="display:block; text-decoration:none; margin-bottom: 1rem;"
-          onclick="trySystemOpen(event)">
-          🔗 Open in ${isIOS ? 'Safari' : 'Browser'}
+        <h1>Connect Your Wallet</h1>
+        <p class="subtitle">Tap below to open in your wallet app, where you can sign and verify your $CLAWD tokens.</p>
+        <a href="${metamaskDeepLink}"
+          class="btn" style="display:block; text-decoration:none; margin-bottom: 1rem;">
+          🦊 Open in MetaMask
         </a>
         <button class="btn" style="background: #333;" onclick="copyUrl()">📋 Copy Link Instead</button>
-        <div id="copyConfirm" class="step" style="margin-top: 0.5rem;"></div>
+        <p class="step" style="margin-top: 0.5rem;">Or paste in any browser with a wallet extension</p>
+        <div id="copyConfirm" class="step"></div>
         <div id="status" class="status"></div>
       `;
-
-      // On Android, try intent immediately
-      if (isAndroid) {
-        try {
-          const intentUrl = 'intent://' + url.replace(/^https?:\/\//, '') +
-            '#Intent;scheme=https;package=com.android.chrome;end';
-          window.location.href = intentUrl;
-        } catch(e) {}
-      }
-    }
-
-    function trySystemOpen(e) {
-      // For iOS Telegram: try opening via a blank anchor with target=_blank
-      // The <a> tag already has target="_blank" so the default action may work
-      // If not, also try window.open
-      try { window.open(window.location.href, '_system'); } catch(ex) {}
     }
 
     function copyUrl() {
@@ -130,7 +113,6 @@
       navigator.clipboard.writeText(url).then(() => {
         document.getElementById('copyConfirm').textContent = '✅ Copied! Paste in Safari or Chrome.';
       }).catch(() => {
-        // Fallback: prompt
         prompt('Copy this link:', url);
       });
     }
