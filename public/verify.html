@@ -66,6 +66,61 @@
   </div>
 
   <script>
+    // Detect in-app browsers (Telegram, Twitter/X, Instagram, Facebook, etc.)
+    function isInAppBrowser() {
+      const ua = navigator.userAgent || '';
+      return /Telegram|TelegramBot|Twitter|FBAN|FBAV|Instagram|Line\//i.test(ua)
+        || /WebView|wv\)/i.test(ua);
+    }
+
+    function ejectToSystemBrowser() {
+      const url = window.location.href;
+      // On iOS, window.open sometimes works to break out
+      // But the most reliable way is to show the user a copy-paste fallback
+      const container = document.querySelector('.container');
+      container.innerHTML = `
+        <div class="logo">🦞</div>
+        <h1>Open in Your Browser</h1>
+        <p class="subtitle">In-app browsers (Telegram, Twitter) don't support wallet connections. Open this link in Safari, Chrome, or your wallet's browser.</p>
+        <div style="margin: 1.5rem 0;">
+          <input id="urlBox" type="text" value="${url}" readonly style="
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
+            background: #1a1a1a; color: #e0e0e0; font-size: 0.85rem;
+            font-family: monospace; text-align: center;
+          "/>
+        </div>
+        <button class="btn" onclick="copyUrl()">📋 Copy Link</button>
+        <p class="step" style="margin-top: 1rem;">Then paste it in Safari, Chrome, or your wallet app's browser</p>
+        <div id="status" class="status"></div>
+      `;
+
+      // Also try to open in system browser (works on some platforms)
+      // Android: intent:// scheme. iOS: sometimes window.open works.
+      try {
+        // Android Chrome intent
+        if (/android/i.test(navigator.userAgent)) {
+          const intentUrl = 'intent://' + url.replace(/^https?:\/\//, '') +
+            '#Intent;scheme=https;package=com.android.chrome;end';
+          window.location.href = intentUrl;
+        }
+      } catch(e) {}
+    }
+
+    function copyUrl() {
+      const box = document.getElementById('urlBox');
+      box.select();
+      navigator.clipboard.writeText(box.value).then(() => {
+        showStatus('success', '✅ Copied! Now paste in your browser.');
+      }).catch(() => {
+        showStatus('info', 'Long-press the link above to copy it.');
+      });
+    }
+
+    // Check immediately
+    if (isInAppBrowser()) {
+      document.addEventListener('DOMContentLoaded', ejectToSystemBrowser);
+    }
+
     const params = new URLSearchParams(window.location.search);
     const telegramUserId = params.get('tg');
     const chatId = params.get('chat');
