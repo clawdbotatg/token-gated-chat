@@ -1,1 +1,16 @@
-{"projectId":"prj_P9wK7SJj0oM0YeNcwjdi71eCrVTI","orgId":"team_CGnKjJxxZopM4R0pQR8RsBSP","projectName":"token-gated-chat"}
+{
+  "projectId": "prj_P9wK7SJj0oM0YeNcwjdi71eCrVTI",
+  "orgId": "team_CGnKjJxxZopM4R0pQR8RsBSP",
+  "projectName": "token-gated-chat",
+  "settings": {
+    "createdAt": 1771031377869,
+    "framework": null,
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}
