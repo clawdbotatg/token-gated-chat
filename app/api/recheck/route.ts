@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVerifiedUsers, removeVerifiedUser } from "~/lib/github-store";
+import { getVerifiedUsers, removeVerifiedUser } from "~/lib/kv-store";
 import { checkBalance } from "~/lib/token";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
@@ -30,9 +30,11 @@ async function kickUser(telegramUserId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  // Auth check — cron passes secret as query param
+  // Auth: Vercel cron header OR query param secret
+  const cronHeader = req.headers.get("authorization");
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== RECHECK_SECRET) {
+  const isVercelCron = cronHeader === `Bearer ${process.env.CRON_SECRET}`;
+  if (!isVercelCron && secret !== RECHECK_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

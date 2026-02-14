@@ -2,8 +2,8 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/recheck?secret=${NONCE_SECRET}",
-      "schedule": "0 */6 * * *"
+      "path": "/api/recheck",
+      "schedule": "0 */4 * * *"
     }
   ]
 }
