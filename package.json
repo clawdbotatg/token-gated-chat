@@ -1,0 +1,22 @@
+{
+  "name": "token-gated-chat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Token-gated Telegram bouncer bot for $CLAWD holders",
+  "scripts": {
+    "bot": "node bot/index.js",
+    "web": "node web/server.js",
+    "dev": "concurrently \"npm run bot\" \"npm run web\""
+  },
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "siwe": "^2.3.2",
+    "ethers": "^6.11.1",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
