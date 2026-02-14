@@ -4,17 +4,28 @@
   "private": true,
   "description": "Token-gated Telegram bouncer bot for $CLAWD holders",
   "scripts": {
-    "bot": "node bot/index.js",
-    "web": "node web/server.js",
-    "dev": "concurrently \"npm run bot\" \"npm run web\""
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "bot": "node bot/index.js"
   },
   "dependencies": {
-    "grammy": "^1.21.1",
-    "express": "^4.18.2",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@tanstack/react-query": "^5.90.21",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
     "cors": "^2.8.5",
-    "siwe": "^2.3.2",
+    "dotenv": "^16.4.1",
     "ethers": "^6.11.1",
-    "dotenv": "^16.4.1"
+    "express": "^4.18.2",
+    "grammy": "^1.21.1",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "siwe": "^2.3.2",
+    "typescript": "^5.9.3",
+    "viem": "^2.45.3",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

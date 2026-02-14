@@ -1,0 +1,13 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/_not-found/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__afaffb17._.js")
+R.c("server/chunks/ssr/547c1_next_dist_787090b0._.js")
+R.c("server/chunks/ssr/547c1_next_dist_esm_build_templates_app-page_e8a6af63.js")
+R.c("server/chunks/ssr/[root-of-the-server]__8f2ca349._.js")
+R.c("server/chunks/ssr/547c1_next_dist_dfd97079._.js")
+R.c("server/chunks/ssr/547c1_next_dist_da13d971._.js")
+R.c("server/chunks/ssr/_openclaw_workspace_token-gated-chat_app_403dcc06._.js")
+R.c("server/chunks/ssr/547c1_next_dist_client_components_f3e56e55._.js")
+R.c("server/chunks/ssr/547c1_next_dist_client_components_builtin_forbidden_42a18ecd.js")
+R.c("server/chunks/ssr/c111f_token-gated-chat__next-internal_server_app__not-found_page_actions_b9aa2eaf.js")
+R.m(384797)
+module.exports=R.m(384797).exports
