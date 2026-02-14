@@ -7,11 +7,14 @@ export function createNonce(telegramUserId: string, chatId: string): string {
   const payload = JSON.stringify({ tg: telegramUserId, chat: chatId, ts: Date.now(), r: random });
   const encoded = Buffer.from(payload).toString("base64url");
   const hmac = crypto.createHmac("sha256", SECRET).update(encoded).digest("hex").slice(0, 16);
-  return `${encoded}.${hmac}`;
+  // SIWE nonces must be alphanumeric only — no dots or special chars
+  return `${encoded}${hmac}`;
 }
 
 export function verifyNonce(nonce: string): { tg: string; chat: string; ts: number } | null {
-  const [encoded, hmac] = nonce.split(".");
+  // HMAC is always last 16 hex chars, encoded is the rest
+  const hmac = nonce.slice(-16);
+  const encoded = nonce.slice(0, -16);
   if (!encoded || !hmac) return null;
 
   const expected = crypto.createHmac("sha256", SECRET).update(encoded).digest("hex").slice(0, 16);
