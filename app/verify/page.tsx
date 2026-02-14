@@ -10,11 +10,32 @@ function VerifyInner() {
   const tg = searchParams.get("tg");
   const chat = searchParams.get("chat");
 
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
   const [status, setStatus] = useState<"idle" | "signing" | "verifying" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+
+  // Try to redirect user to their wallet app (for WalletConnect in in-app browsers)
+  async function redirectToWallet() {
+    try {
+      const provider: any = await connector?.getProvider();
+      // WalletConnect v2: session has peer metadata with redirect URLs
+      const session = provider?.session;
+      const redirect = session?.peer?.metadata?.redirect;
+      const walletUrl = redirect?.native || redirect?.universal;
+      if (walletUrl) {
+        window.location.href = walletUrl;
+        return;
+      }
+    } catch {}
+    // Fallback: try common deep links based on connector name
+    const name = connector?.name?.toLowerCase() || "";
+    if (name.includes("rainbow")) window.location.href = "rainbow://";
+    else if (name.includes("metamask")) window.location.href = "metamask://";
+    else if (name.includes("coinbase")) window.location.href = "cbwallet://";
+    // If we can't determine the wallet, do nothing — WC push notification should alert them
+  }
 
   const missingParams = !tg || !chat;
 
@@ -45,10 +66,15 @@ function VerifyInner() {
         `Issued At: ${new Date().toISOString()}`,
       ].join("\n");
 
-      setMessage("Sign the message in your wallet...");
+      setMessage("Opening wallet to sign...");
 
-      // Sign
-      const signature = await signMessageAsync({ account: address, message: siweMessage });
+      // Fire the sign request — don't await yet, redirect to wallet first
+      const signPromise = signMessageAsync({ account: address, message: siweMessage });
+
+      // Give WalletConnect a moment to send the request, then redirect to wallet app
+      setTimeout(() => redirectToWallet(), 500);
+
+      const signature = await signPromise;
 
       setStatus("verifying");
       setMessage("Verifying on-chain balance...");
