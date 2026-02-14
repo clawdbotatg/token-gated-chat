@@ -91,45 +91,35 @@
       container.innerHTML = `
         <div class="logo">🦞</div>
         <h1>Open in Safari</h1>
-        <p class="subtitle">Telegram's browser can't connect to wallets.<br>Tap the button, then paste in Safari.</p>
-        <button id="copyBtn" class="btn" onclick="copyAndGuide()">
-          📋 Copy Link
+        <p class="subtitle">Telegram's browser can't connect wallets.</p>
+        <button id="shareBtn" class="btn" onclick="openInSafari()" style="margin-bottom: 0.75rem;">
+          🧭 Open in Safari
         </button>
-        <div id="steps" class="step" style="margin-top: 1.5rem; line-height: 1.8; font-size: 1rem; color: #aaa;"></div>
+        <button class="btn" style="background: #333;" onclick="copyFallback()">📋 Copy Link</button>
         <div id="status" class="status"></div>
       `;
-
-      // Auto-copy on load (may need user gesture on some browsers)
-      setTimeout(() => {
-        navigator.clipboard.writeText(url).then(() => {
-          document.getElementById('copyBtn').innerHTML = '✅ Link Copied!';
-          document.getElementById('copyBtn').style.background = '#2d6b2d';
-          showSteps();
-        }).catch(() => {
-          // Needs user tap — that's fine, button is right there
-        });
-      }, 300);
     }
 
-    function copyAndGuide() {
+    function openInSafari() {
+      const url = window.location.href;
+      // navigator.share opens iOS Share Sheet — user can pick Safari
+      if (navigator.share) {
+        navigator.share({ url: url }).catch(() => {
+          // User cancelled share sheet — fall back to copy
+          copyFallback();
+        });
+      } else {
+        copyFallback();
+      }
+    }
+
+    function copyFallback() {
       const url = window.location.href;
       navigator.clipboard.writeText(url).then(() => {
-        const btn = document.getElementById('copyBtn');
-        btn.innerHTML = '✅ Link Copied!';
-        btn.style.background = '#2d6b2d';
-        showSteps();
+        showStatus('success', '✅ Copied! Paste in Safari\'s address bar.');
       }).catch(() => {
         prompt('Copy this link:', url);
       });
-    }
-
-    function showSteps() {
-      document.getElementById('steps').innerHTML = `
-        <p style="margin-bottom: 0.5rem;">Now:</p>
-        <p>1️⃣ &nbsp;Open <strong style="color:#e0e0e0;">Safari</strong></p>
-        <p>2️⃣ &nbsp;Paste in the address bar</p>
-        <p>3️⃣ &nbsp;Connect wallet &amp; verify</p>
-      `;
     }
 
     // Check on load — eject if in-app OR no wallet
