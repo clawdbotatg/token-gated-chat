@@ -66,59 +66,82 @@
   </div>
 
   <script>
-    // Detect in-app browsers (Telegram, Twitter/X, Instagram, Facebook, etc.)
+    // Detect in-app browsers — be aggressive, check for NO wallet too
     function isInAppBrowser() {
       const ua = navigator.userAgent || '';
-      return /Telegram|TelegramBot|Twitter|FBAN|FBAV|Instagram|Line\//i.test(ua)
-        || /WebView|wv\)/i.test(ua);
+      // Explicit in-app browser UAs
+      if (/Telegram|TelegramBot|Twitter|FBAN|FBAV|Instagram|Line\/|Snapchat|Discord/i.test(ua)) return true;
+      // Generic WebView detection
+      if (/WebView|wv\)/i.test(ua)) return true;
+      // iOS: Telegram doesn't always set its UA, but it IS a WKWebView without Safari
+      // Real Safari has "Safari/" in UA. In-app WKWebViews typically don't.
+      if (/iPhone|iPad|iPod/i.test(ua) && !/Safari\//i.test(ua)) return true;
+      return false;
+    }
+
+    function shouldEject() {
+      // Eject if in-app browser OR no wallet available
+      return isInAppBrowser() || !window.ethereum;
     }
 
     function ejectToSystemBrowser() {
       const url = window.location.href;
-      // On iOS, window.open sometimes works to break out
-      // But the most reliable way is to show the user a copy-paste fallback
       const container = document.querySelector('.container');
+
+      // Try auto-open in system browser first
+      // On iOS: window.open with _blank sometimes breaks out of in-app browser
+      // On Android: intent:// for Chrome
+      const isAndroid = /android/i.test(navigator.userAgent);
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
       container.innerHTML = `
         <div class="logo">🦞</div>
         <h1>Open in Your Browser</h1>
-        <p class="subtitle">In-app browsers (Telegram, Twitter) don't support wallet connections. Open this link in Safari, Chrome, or your wallet's browser.</p>
-        <div style="margin: 1.5rem 0;">
-          <input id="urlBox" type="text" value="${url}" readonly style="
-            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
-            background: #1a1a1a; color: #e0e0e0; font-size: 0.85rem;
-            font-family: monospace; text-align: center;
-          "/>
-        </div>
-        <button class="btn" onclick="copyUrl()">📋 Copy Link</button>
-        <p class="step" style="margin-top: 1rem;">Then paste it in Safari, Chrome, or your wallet app's browser</p>
+        <p class="subtitle">This page needs a wallet (like MetaMask) to verify your $CLAWD tokens. Open it in ${isIOS ? 'Safari' : 'Chrome'} or your wallet app's browser.</p>
+        <a href="${url}" target="_blank" rel="noopener"
+          class="btn" style="display:block; text-decoration:none; margin-bottom: 1rem;"
+          onclick="trySystemOpen(event)">
+          🔗 Open in ${isIOS ? 'Safari' : 'Browser'}
+        </a>
+        <button class="btn" style="background: #333;" onclick="copyUrl()">📋 Copy Link Instead</button>
+        <div id="copyConfirm" class="step" style="margin-top: 0.5rem;"></div>
         <div id="status" class="status"></div>
       `;
 
-      // Also try to open in system browser (works on some platforms)
-      // Android: intent:// scheme. iOS: sometimes window.open works.
-      try {
-        // Android Chrome intent
-        if (/android/i.test(navigator.userAgent)) {
+      // On Android, try intent immediately
+      if (isAndroid) {
+        try {
           const intentUrl = 'intent://' + url.replace(/^https?:\/\//, '') +
             '#Intent;scheme=https;package=com.android.chrome;end';
           window.location.href = intentUrl;
-        }
-      } catch(e) {}
+        } catch(e) {}
+      }
+    }
+
+    function trySystemOpen(e) {
+      // For iOS Telegram: try opening via a blank anchor with target=_blank
+      // The <a> tag already has target="_blank" so the default action may work
+      // If not, also try window.open
+      try { window.open(window.location.href, '_system'); } catch(ex) {}
     }
 
     function copyUrl() {
-      const box = document.getElementById('urlBox');
-      box.select();
-      navigator.clipboard.writeText(box.value).then(() => {
-        showStatus('success', '✅ Copied! Now paste in your browser.');
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        document.getElementById('copyConfirm').textContent = '✅ Copied! Paste in Safari or Chrome.';
       }).catch(() => {
-        showStatus('info', 'Long-press the link above to copy it.');
+        // Fallback: prompt
+        prompt('Copy this link:', url);
       });
     }
 
-    // Check immediately
-    if (isInAppBrowser()) {
-      document.addEventListener('DOMContentLoaded', ejectToSystemBrowser);
+    // Check on load — eject if in-app OR no wallet
+    if (shouldEject()) {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ejectToSystemBrowser);
+      } else {
+        ejectToSystemBrowser();
+      }
     }
 
     const params = new URLSearchParams(window.location.search);
