@@ -96,7 +96,7 @@ function VerifyInner() {
           <div style={errorStyle}>Missing verification parameters. Use the link from the Telegram bot.</div>
         ) : (
           <>
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "center" }}>
               <ConnectButton />
             </div>
 
