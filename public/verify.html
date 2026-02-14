@@ -88,33 +88,48 @@
       const url = window.location.href;
       const container = document.querySelector('.container');
 
-      // Build MetaMask deep link — opens our page INSIDE MetaMask's browser
-      // where window.ethereum is available. Works from any in-app browser.
-      const dappUrl = window.location.host + window.location.pathname + window.location.search;
-      const metamaskDeepLink = 'https://metamask.app.link/dapp/' + dappUrl;
-
       container.innerHTML = `
         <div class="logo">🦞</div>
-        <h1>Connect Your Wallet</h1>
-        <p class="subtitle">Tap below to open in your wallet app, where you can sign and verify your $CLAWD tokens.</p>
-        <a href="${metamaskDeepLink}"
-          class="btn" style="display:block; text-decoration:none; margin-bottom: 1rem;">
-          🦊 Open in MetaMask
-        </a>
-        <button class="btn" style="background: #333;" onclick="copyUrl()">📋 Copy Link Instead</button>
-        <p class="step" style="margin-top: 0.5rem;">Or paste in any browser with a wallet extension</p>
-        <div id="copyConfirm" class="step"></div>
+        <h1>Open in Safari</h1>
+        <p class="subtitle">Telegram's browser can't connect to wallets.<br>Tap the button, then paste in Safari.</p>
+        <button id="copyBtn" class="btn" onclick="copyAndGuide()">
+          📋 Copy Link
+        </button>
+        <div id="steps" class="step" style="margin-top: 1.5rem; line-height: 1.8; font-size: 1rem; color: #aaa;"></div>
         <div id="status" class="status"></div>
       `;
+
+      // Auto-copy on load (may need user gesture on some browsers)
+      setTimeout(() => {
+        navigator.clipboard.writeText(url).then(() => {
+          document.getElementById('copyBtn').innerHTML = '✅ Link Copied!';
+          document.getElementById('copyBtn').style.background = '#2d6b2d';
+          showSteps();
+        }).catch(() => {
+          // Needs user tap — that's fine, button is right there
+        });
+      }, 300);
     }
 
-    function copyUrl() {
+    function copyAndGuide() {
       const url = window.location.href;
       navigator.clipboard.writeText(url).then(() => {
-        document.getElementById('copyConfirm').textContent = '✅ Copied! Paste in Safari or Chrome.';
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '✅ Link Copied!';
+        btn.style.background = '#2d6b2d';
+        showSteps();
       }).catch(() => {
         prompt('Copy this link:', url);
       });
+    }
+
+    function showSteps() {
+      document.getElementById('steps').innerHTML = `
+        <p style="margin-bottom: 0.5rem;">Now:</p>
+        <p>1️⃣ &nbsp;Open <strong style="color:#e0e0e0;">Safari</strong></p>
+        <p>2️⃣ &nbsp;Paste in the address bar</p>
+        <p>3️⃣ &nbsp;Connect wallet &amp; verify</p>
+      `;
     }
 
     // Check on load — eject if in-app OR no wallet
