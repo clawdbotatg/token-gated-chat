@@ -115,7 +115,7 @@ function VerifyInner() {
         <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🦞</div>
         <h1 style={{ fontSize: "1.5rem", marginBottom: "0.5rem", color: "#ff6b6b" }}>$CLAWD Token Gate</h1>
         <p style={{ color: "#888", marginBottom: "2rem", fontSize: "0.9rem" }}>
-          Connect your wallet and verify you hold $CLAWD on Base to join the chat
+          Connect your wallet and verify you hold at least 10M $CLAWD on Base to join the chat
         </p>
 
         {missingParams ? (
