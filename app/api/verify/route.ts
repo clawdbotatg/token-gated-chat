@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (!hasBalance) {
       return NextResponse.json(
         {
-          error: "Insufficient $CLAWD balance. You need at least 1 $CLAWD on Base.",
+          error: "Insufficient $CLAWD balance. You need at least 10,000,000 $CLAWD on Base.",
           address: verified.address,
         },
         { status: 403 },
