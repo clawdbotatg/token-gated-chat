@@ -4,48 +4,23 @@ import { verifyNonce } from "~/lib/nonce";
 import { checkBalance } from "~/lib/token";
 import { saveVerifiedUser } from "~/lib/kv-store";
 
+const HARDCODED_INVITE_LINK = "https://t.me/+REDACTED";
+
 async function sendTelegramInvite(telegramUserId: string, wallet: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) return null;
+  if (!botToken) return null;
 
   try {
-    const linkRes = await fetch(`https://api.telegram.org/bot${botToken}/createChatInviteLink`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: Number(chatId),
-        member_limit: 1,
-        name: `CLAWD Gate: ${wallet.slice(0, 8)}`,
-      }),
-    });
-    const linkData = await linkRes.json();
-
-    if (!linkData.ok) {
-      console.error("Failed to create invite link:", linkData);
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: Number(telegramUserId),
-          text: `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\nBut I couldn't generate an invite link. Please contact an admin.`,
-        }),
-      });
-      return null;
-    }
-
-    const inviteLink = linkData.result.invite_link;
-
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: Number(telegramUserId),
-        text: `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\nHere's your invite to the holders chat:\n👉 ${inviteLink}\n\nThis link is single-use. Welcome aboard!`,
+        text: `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\nHere's your invite to the holders chat:\n👉 ${HARDCODED_INVITE_LINK}\n\nWelcome aboard!`,
       }),
     });
 
-    return inviteLink;
+    return HARDCODED_INVITE_LINK;
   } catch (err: any) {
     console.error("Telegram API error:", err.message);
     return null;
