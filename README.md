@@ -111,3 +111,5 @@ tail -f bot-error.log
 - **Auth**: EIP-4361 (SIWE)
 - **Chain**: Base (via Alchemy RPC)
 - **Storage**: Upstash Redis (KV) + local JSON fallback
+
+<!-- deploy trigger Sun Feb 15 21:45:37 MST 2026 -->
