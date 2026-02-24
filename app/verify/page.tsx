@@ -90,7 +90,7 @@ function VerifyInner() {
 
       if (result.success) {
         setStatus("success");
-        setMessage("✅ Verified! Check your Telegram DMs from @ClawdBouncerBot — your invite link is there! 🦞");
+        setMessage("✅ Verified! Check your Telegram DMs from @ClawdPrivateBot — your invite link is there! 🦞");
       } else {
         setStatus("error");
         setMessage(result.error || "Verification failed");
