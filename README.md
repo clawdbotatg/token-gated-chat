@@ -1,10 +1,10 @@
 # 🦞 $CLAWD Token-Gated Telegram Chat
 
-A bouncer bot (@ClawdPrivateBot) that gates Telegram group access to $CLAWD token holders on Base.
+A bouncer bot (@ClawdChatTGBot) that gates Telegram group access to $CLAWD token holders on Base.
 
 ## How It Works
 
-1. User DMs @ClawdPrivateBot → sends `/start`
+1. User DMs @ClawdChatTGBot → sends `/start`
 2. Bot replies with a verification link
 3. User opens the link, connects wallet via RainbowKit, signs a SIWE message
 4. Server checks $CLAWD balance on Base — if sufficient, user gets a single-use invite link
