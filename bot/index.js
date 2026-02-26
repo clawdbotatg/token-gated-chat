@@ -71,7 +71,8 @@ bot.on("message:text", async (ctx) => {
 });
 
 // Hardcoded invite link — always use this
-const INVITE_LINK = "https://t.me/+REDACTED";
+const INVITE_LINK = process.env.TELEGRAM_INVITE_LINK;
+if (!INVITE_LINK) throw new Error("TELEGRAM_INVITE_LINK env var is not set");
 
 function getInviteLink() {
   return INVITE_LINK;

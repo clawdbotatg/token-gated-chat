@@ -4,7 +4,7 @@ import { verifyNonce } from "~/lib/nonce";
 import { checkBalance } from "~/lib/token";
 import { saveVerifiedUser } from "~/lib/kv-store";
 
-const HARDCODED_INVITE_LINK = "https://t.me/+REDACTED";
+const HARDCODED_INVITE_LINK = process.env.TELEGRAM_INVITE_LINK!;
 
 async function sendTelegramInvite(telegramUserId: string, wallet: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
