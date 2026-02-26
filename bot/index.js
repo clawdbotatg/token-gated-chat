@@ -3,7 +3,7 @@ const config = require("../shared/config");
 const store = require("../shared/store");
 const { checkBalance } = require("../shared/token");
 
-const { getVerifiedUserFromKV } = require("./kv-check");
+const { getVerifiedUserFromKV, getAllUsersFromKV, removeUserFromKV } = require("./kv-check");
 
 const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 
@@ -11,18 +11,16 @@ const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
 bot.command("start", async (ctx) => {
   const userId = ctx.from.id;
 
-  // Check if already verified
-  const existing = store.getUser(userId);
+  // Check if already verified (local store first, then KV)
+  const existing = store.getUser(userId) || await getVerifiedUserFromKV(userId);
   if (existing) {
     const hasBalance = await checkBalance(existing.wallet);
     if (hasBalance) {
-      const inviteLink = await getInviteLink();
+      const inviteLink = getInviteLink();
       await ctx.reply(
         `🦞 You're already verified!\n\n` +
           `Wallet: \`${existing.wallet.slice(0, 6)}...${existing.wallet.slice(-4)}\`\n\n` +
-          (inviteLink
-            ? `Join the $CLAWD holders chat:\n👉 ${inviteLink}`
-            : `You're verified but I couldn't generate an invite link. Ask an admin!`),
+          `Join the $CLAWD holders chat:\n👉 ${inviteLink}`,
         { parse_mode: "Markdown" }
       );
       return;
@@ -43,7 +41,7 @@ bot.command("start", async (ctx) => {
 
 // /status command
 bot.command("status", async (ctx) => {
-  const user = store.getUser(ctx.from.id);
+  const user = store.getUser(ctx.from.id) || await getVerifiedUserFromKV(ctx.from.id);
   if (!user) {
     await ctx.reply("❌ Not verified yet. Send /start to begin!");
     return;
@@ -70,22 +68,11 @@ bot.on("message:text", async (ctx) => {
   await ctx.reply("Send /start to verify your $CLAWD tokens and get an invite link! 🦞");
 });
 
-// Generate a one-time invite link
-let _cachedInviteLink = null;
-let _inviteLinkExpiry = 0;
+// Hardcoded invite link — always use this
+const INVITE_LINK = "https://t.me/+REDACTED";
 
-async function getInviteLink() {
-  try {
-    // Create a fresh invite link each time (single-use)
-    const result = await bot.api.createChatInviteLink(Number(config.TELEGRAM_CHAT_ID), {
-      member_limit: 1,
-      name: "CLAWD Token Gate",
-    });
-    return result.invite_link;
-  } catch (err) {
-    console.error("Failed to create invite link:", err.message);
-    return null;
-  }
+function getInviteLink() {
+  return INVITE_LINK;
 }
 
 // HTTP endpoint for Vercel to call after successful verification
@@ -98,17 +85,15 @@ setInterval(async () => {
 
     // New verification! Send invite link
     try {
-      const inviteLink = await getInviteLink();
-      if (inviteLink) {
-        await bot.api.sendMessage(
-          Number(telegramUserId),
-          `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\n` +
-            `Here's your invite to the holders chat:\n👉 ${inviteLink}\n\n` +
-            `This link is single-use. Welcome aboard!`
-        );
-        store.markInviteSent(telegramUserId);
-        console.log(`✅ Sent invite to user ${telegramUserId}`);
-      }
+      const inviteLink = getInviteLink();
+      await bot.api.sendMessage(
+        Number(telegramUserId),
+        `🦞 ✅ Verified! Your wallet holds $CLAWD.\n\n` +
+          `Here's your invite to the holders chat:\n👉 ${inviteLink}\n\n` +
+          `Welcome aboard!`
+      );
+      store.markInviteSent(telegramUserId);
+      console.log(`✅ Sent invite to user ${telegramUserId}`);
     } catch (err) {
       console.error(`Failed to send invite to ${telegramUserId}:`, err.message);
     }
@@ -118,11 +103,21 @@ setInterval(async () => {
 // Periodic balance re-check — kick users who sold
 async function recheckBalances() {
   console.log("Running periodic balance re-check...");
-  const users = store.getAllUsers();
-  for (const [telegramUserId, data] of Object.entries(users)) {
+
+  // Merge local store + KV users (KV is the primary source for web-verified users)
+  const localUsers = store.getAllUsers();
+  const kvUsers = await getAllUsersFromKV();
+  const allUsers = { ...kvUsers, ...localUsers }; // local takes precedence if duplicate
+
+  const userCount = Object.keys(allUsers).length;
+  if (userCount > 0) {
+    console.log(`Re-checking ${userCount} verified users...`);
+  }
+
+  for (const [telegramUserId, data] of Object.entries(allUsers)) {
     const hasBalance = await checkBalance(data.wallet);
     if (!hasBalance) {
-      console.log(`User ${telegramUserId} no longer holds tokens`);
+      console.log(`🚫 User ${telegramUserId} (${data.wallet?.slice(0,6)}...) no longer holds tokens — kicking`);
       try {
         await bot.api.banChatMember(Number(config.TELEGRAM_CHAT_ID), Number(telegramUserId), {
           until_date: Math.floor(Date.now() / 1000) + 60,
@@ -134,7 +129,9 @@ async function recheckBalances() {
       } catch (e) {
         console.error(`Failed to kick ${telegramUserId}:`, e.message);
       }
+      // Remove from both stores
       store.removeUser(telegramUserId);
+      await removeUserFromKV(telegramUserId);
     }
   }
 }

@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       address: verified.address,
       telegramUserId: nonceData.tg,
       inviteSent: !!inviteLink,
+      inviteLink: HARDCODED_INVITE_LINK,
     });
   } catch (err: any) {
     console.error("Verification error:", err.message);

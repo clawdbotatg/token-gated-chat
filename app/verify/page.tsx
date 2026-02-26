@@ -15,6 +15,7 @@ function VerifyInner() {
 
   const [status, setStatus] = useState<"idle" | "signing" | "verifying" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   // Try to redirect user to their wallet app (for WalletConnect in in-app browsers)
   async function redirectToWallet() {
@@ -90,7 +91,10 @@ function VerifyInner() {
 
       if (result.success) {
         setStatus("success");
-        setMessage("✅ Verified! Check your Telegram DMs from @ClawdChatTGBot — your invite link is there! 🦞");
+        setInviteLink(result.inviteLink || null);
+        setMessage(result.inviteLink
+          ? `✅ Verified! Here's your invite link 👇`
+          : `✅ Verified! Check your Telegram DMs from @ClawdChatTGBot 🦞`);
       } else {
         setStatus("error");
         setMessage(result.error || "Verification failed");
@@ -163,6 +167,27 @@ function VerifyInner() {
               >
                 {message}
               </div>
+            )}
+
+            {status === "success" && inviteLink && (
+              <a
+                href={inviteLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "block",
+                  marginTop: "1rem",
+                  padding: "14px 32px",
+                  background: "#ff6b6b",
+                  color: "white",
+                  borderRadius: "12px",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                👉 Join the $CLAWD Chat
+              </a>
             )}
           </>
         )}

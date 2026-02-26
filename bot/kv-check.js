@@ -25,4 +25,26 @@ async function getVerifiedUserFromKV(telegramUserId) {
   }
 }
 
-module.exports = { getVerifiedUserFromKV };
+async function getAllUsersFromKV() {
+  const r = getRedis();
+  if (!r) return {};
+  try {
+    const data = await r.hgetall("verified-users");
+    return data || {};
+  } catch (err) {
+    console.error("KV hgetall error:", err.message);
+    return {};
+  }
+}
+
+async function removeUserFromKV(telegramUserId) {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await r.hdel("verified-users", String(telegramUserId));
+  } catch (err) {
+    console.error("KV hdel error:", err.message);
+  }
+}
+
+module.exports = { getVerifiedUserFromKV, getAllUsersFromKV, removeUserFromKV };
