@@ -4,11 +4,14 @@ import { verifyNonce } from "~/lib/nonce";
 import { checkBalance } from "~/lib/token";
 import { saveVerifiedUser } from "~/lib/kv-store";
 
-const HARDCODED_INVITE_LINK = process.env.TELEGRAM_INVITE_LINK!;
+const HARDCODED_INVITE_LINK = process.env.TELEGRAM_INVITE_LINK;
+if (!HARDCODED_INVITE_LINK) {
+  console.error("FATAL: TELEGRAM_INVITE_LINK env var is not set — invite links will not work");
+}
 
 async function sendTelegramInvite(telegramUserId: string, wallet: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) return null;
+  if (!botToken || !HARDCODED_INVITE_LINK) return null;
 
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
