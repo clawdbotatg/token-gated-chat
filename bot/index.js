@@ -16,7 +16,22 @@ bot.command("start", async (ctx) => {
   // Check if already verified (local store first, then KV)
   const existing = store.getUser(userId) || await getVerifiedUserFromKV(userId);
   if (existing) {
-    const hasBalance = await checkBalance(existing.wallet);
+    let hasBalance = false;
+    try {
+      hasBalance = await checkBalance(existing.wallet);
+    } catch (err) {
+      // RPC error — treat as still verified
+      console.error(`⚠️ Balance check failed in /start for user ${userId}: ${err.message}`);
+      const inviteLink = getInviteLink();
+      await ctx.reply(
+        `🦞 You're already verified!\n\n` +
+          `Wallet: \`${existing.wallet.slice(0, 6)}...${existing.wallet.slice(-4)}\`\n\n` +
+          `⚠️ Note: Balance check is temporarily unavailable, but your verification is still valid.\n\n` +
+          `Join the $CLAWD holders chat:\n👉 ${inviteLink}`,
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
     if (hasBalance) {
       const inviteLink = getInviteLink();
       await ctx.reply(
@@ -27,7 +42,7 @@ bot.command("start", async (ctx) => {
       );
       return;
     }
-    // Balance gone
+    // Balance confirmed zero
     store.removeUser(userId);
   }
 
@@ -135,13 +150,15 @@ function generateHtmlReport(rows, clawdPrice, kickedCount) {
   const rowsHtml = rows
     .sort((a, b) => b.tokens - a.tokens)
     .map(r => `
-      <tr class="${r.kicked ? 'kicked' : ''}">
+      <tr class="${r.kicked ? 'kicked' : ''}${r.rpcError ? ' rpc-error' : ''}">
         <td>${r.handle}</td>
         <td>${r.wallet}</td>
-        <td class="num">${r.tokens.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
-        <td class="num">$${r.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td class="status">${r.kicked ? '🚫 Kicked' : '✅ OK'}</td>
+        <td class="num">${r.rpcError ? '—' : r.tokens.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
+        <td class="num">${r.rpcError ? '—' : '$' + r.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td class="status">${r.rpcError ? '⚠️ RPC error' : r.kicked ? '🚫 Kicked' : '✅ OK'}</td>
       </tr>`).join("");
+
+  const rpcErrorCount = rows.filter(r => r.rpcError).length;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -163,6 +180,7 @@ function generateHtmlReport(rows, clawdPrice, kickedCount) {
   td { padding: 9px 12px; border-bottom: 1px solid #1a1a1a; }
   tr:hover td { background: #161616; }
   tr.kicked td { opacity: 0.45; }
+  tr.rpc-error td { color: #ffb86b; opacity: 0.7; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .status { font-weight: 600; }
   .wallet { font-family: monospace; font-size: 0.8rem; color: #666; }
@@ -171,12 +189,13 @@ function generateHtmlReport(rows, clawdPrice, kickedCount) {
 </head>
 <body>
   <h1>🦞 $CLAWD Token Gate Report</h1>
-  <div class="sub">Generated ${now} · CLAWD price: $${clawdPrice.toFixed(8)} · ${kickedCount} kicked this run</div>
+  <div class="sub">Generated ${now} · CLAWD price: $${clawdPrice.toFixed(8)} · ${kickedCount} kicked this run${rpcErrorCount > 0 ? ` · ${rpcErrorCount} RPC errors` : ''}</div>
   <div class="stats">
-    <div class="stat"><div class="label">Verified Holders</div><div class="val">${rows.filter(r => !r.kicked).length}</div></div>
+    <div class="stat"><div class="label">Verified Holders</div><div class="val">${rows.filter(r => !r.kicked && !r.rpcError).length}</div></div>
     <div class="stat"><div class="label">Total $CLAWD Held</div><div class="val">${(totalTokens / 1e6).toFixed(2)}M</div></div>
     <div class="stat"><div class="label">Total USD Value</div><div class="val">$${totalUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div></div>
     <div class="stat"><div class="label">Kicked This Run</div><div class="val" style="color:${kickedCount > 0 ? '#ff4444' : '#6bff6b'}">${kickedCount}</div></div>
+    ${rpcErrorCount > 0 ? `<div class="stat"><div class="label">RPC Errors</div><div class="val" style="color:#ffb86b">${rpcErrorCount}</div></div>` : ''}
   </div>
   <table>
     <thead><tr><th>Handle</th><th>Wallet</th><th class="num">$CLAWD</th><th class="num">USD Value</th><th>Status</th></tr></thead>
@@ -214,7 +233,18 @@ async function recheckBalances() {
   for (const [telegramUserId, data] of Object.entries(allUsers)) {
     let rawBalance = 0n;
     let kicked = false;
-    try { rawBalance = await getBalance(data.wallet); } catch {}
+    let fetchFailed = false;
+    try { rawBalance = await getBalance(data.wallet); } catch (err) {
+      console.error(`Balance fetch failed for ${data.wallet}: ${err.message}`);
+      fetchFailed = true;
+    }
+
+    // RPC failed — include in report as "unknown" so the error is visible, but don't kick
+    if (fetchFailed) {
+      const handle = await getTelegramHandle(telegramUserId);
+      reportRows.push({ handle, wallet: `${data.wallet?.slice(0,6)}...${data.wallet?.slice(-4)}`, tokens: 0, usd: 0, kicked: false, rpcError: true });
+      continue;
+    }
 
     const hasBalance = rawBalance >= MIN;
 
@@ -268,12 +298,19 @@ bot.on("chat_member", async (ctx) => {
   const existing = store.getUser(userId) || await getVerifiedUserFromKV(userId);
   if (existing) {
     // Verified — double-check balance
-    const hasBalance = await checkBalance(existing.wallet);
+    let hasBalance = false;
+    try {
+      hasBalance = await checkBalance(existing.wallet);
+    } catch (err) {
+      // RPC error — give benefit of the doubt, let them in
+      console.error(`⚠️ Balance check failed on join for ${username} (${existing.wallet}): ${err.message} — allowing entry`);
+      return;
+    }
     if (hasBalance) {
       console.log(`✅ Verified member joined: ${username}`);
       return;
     }
-    // Balance gone — kick
+    // Balance confirmed zero — kick
     store.removeUser(userId);
   }
 
